@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="de.chords.Chords" path="/de/chords/Chords/">
+    <!-- Window state -->
+    <key name="window-width" type="i">
+      <default>1100</default>
+      <summary>Window width</summary>
+    </key>
+    <key name="window-height" type="i">
+      <default>750</default>
+      <summary>Window height</summary>
+    </key>
+    <key name="is-maximized" type="b">
+      <default>false</default>
+      <summary>Whether the window is maximized</summary>
+    </key>
+
+    <!-- Font -->
+    <key name="font-family" type="s">
+      <default>'Monospace'</default>
+      <summary>Font family for chord/tab text</summary>
+    </key>
+    <key name="font-size" type="i">
+      <default>14</default>
+      <summary>Font size in points</summary>
+    </key>
+
+    <!-- Colors -->
+    <key name="chord-color" type="s">
+      <default>'#3584e4'</default>
+      <summary>Highlight color for chords</summary>
+    </key>
+    <key name="section-color" type="s">
+      <default>'#e66100'</default>
+      <summary>Highlight color for section headers</summary>
+    </key>
+
+    <!-- View -->
+    <key name="columns" type="i">
+      <default>1</default>
+      <summary>Number of text columns</summary>
+    </key>
+    <key name="show-chord-diagrams" type="b">
+      <default>false</default>
+      <summary>Whether to show the chord diagrams panel</summary>
+    </key>
+  </schema>
+</schemalist>
