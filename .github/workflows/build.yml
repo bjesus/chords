@@ -38,50 +38,19 @@ jobs:
         run: cargo build --release
 
       - name: Run tests
-        run: cargo test --release
+        run: cargo test --release --bin chords
 
       - name: Package .deb
         run: |
-          mkdir -p pkg/DEBIAN
-          mkdir -p pkg/usr/bin
-          mkdir -p pkg/usr/share/glib-2.0/schemas
-          mkdir -p pkg/usr/share/applications
-
+          mkdir -p pkg/DEBIAN pkg/usr/bin pkg/usr/share/glib-2.0/schemas pkg/usr/share/applications
           cp target/release/chords pkg/usr/bin/
-
           cp data/de.chords.Chords.gschema.xml pkg/usr/share/glib-2.0/schemas/
-
-          cat > pkg/usr/share/applications/de.chords.Chords.desktop << 'EOF'
-          [Desktop Entry]
-          Name=Chords
-          Comment=Guitar chords viewer
-          Exec=chords
-          Icon=emblem-music-symbolic
-          Terminal=false
-          Type=Application
-          Categories=Audio;Music;
-          EOF
-
           VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
-          cat > pkg/DEBIAN/control << EOF
-          Package: chords
-          Version: ${VERSION}
-          Section: sound
-          Priority: optional
-          Architecture: amd64
-          Depends: libgtk-4-1 (>= 4.10), libadwaita-1-0 (>= 1.5)
-          Maintainer: bjesus <github@yoavmoshe.com>
-          Description: A native GNOME guitar chords viewer
-           Browse, search, and save guitar chord sheets.
-          EOF
-
-          cat > pkg/DEBIAN/postinst << 'EOF'
-          #!/bin/sh
-          glib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true
-          EOF
+          printf '[Desktop Entry]\nName=Chords\nComment=Guitar chords viewer\nExec=chords\nIcon=emblem-music-symbolic\nTerminal=false\nType=Application\nCategories=Audio;Music;\n' > pkg/usr/share/applications/de.chords.Chords.desktop
+          printf 'Package: chords\nVersion: %s\nSection: sound\nPriority: optional\nArchitecture: amd64\nDepends: libgtk-4-1 (>= 4.10), libadwaita-1-0 (>= 1.5)\nMaintainer: bjesus <github@yoavmoshe.com>\nDescription: A native GNOME guitar chords viewer\n Browse, search, and save guitar chord sheets.\n' "$VERSION" > pkg/DEBIAN/control
+          printf '#!/bin/sh\nglib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true\n' > pkg/DEBIAN/postinst
           chmod 755 pkg/DEBIAN/postinst
-
-          dpkg-deb --build pkg chords_${VERSION}_amd64.deb
+          dpkg-deb --build pkg "chords_${VERSION}_amd64.deb"
 
       - name: Upload .deb
         uses: actions/upload-artifact@v4
@@ -123,34 +92,12 @@ jobs:
 
       - name: Create AppDir
         run: |
-          mkdir -p AppDir/usr/bin
-          mkdir -p AppDir/usr/share/glib-2.0/schemas
-          mkdir -p AppDir/usr/share/applications
-          mkdir -p AppDir/usr/share/icons/hicolor/scalable/apps
-
+          mkdir -p AppDir/usr/bin AppDir/usr/share/glib-2.0/schemas AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/scalable/apps
           cp target/release/chords AppDir/usr/bin/
-
           cp data/de.chords.Chords.gschema.xml AppDir/usr/share/glib-2.0/schemas/
           glib-compile-schemas AppDir/usr/share/glib-2.0/schemas/
-
-          cat > AppDir/usr/share/applications/de.chords.Chords.desktop << 'EOF'
-          [Desktop Entry]
-          Name=Chords
-          Comment=Guitar chords viewer
-          Exec=chords
-          Icon=de.chords.Chords
-          Terminal=false
-          Type=Application
-          Categories=Audio;Music;
-          EOF
-
-          # Simple SVG icon
-          cat > AppDir/usr/share/icons/hicolor/scalable/apps/de.chords.Chords.svg << 'SVGEOF'
-          <svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
-            <rect width="128" height="128" rx="16" fill="#3584e4"/>
-            <text x="64" y="80" text-anchor="middle" font-family="serif" font-size="72" fill="white">♪</text>
-          </svg>
-          SVGEOF
+          printf '[Desktop Entry]\nName=Chords\nComment=Guitar chords viewer\nExec=chords\nIcon=de.chords.Chords\nTerminal=false\nType=Application\nCategories=Audio;Music;\n' > AppDir/usr/share/applications/de.chords.Chords.desktop
+          printf '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><rect width="128" height="128" rx="16" fill="#3584e4"/><text x="64" y="80" text-anchor="middle" font-family="serif" font-size="72" fill="white">♪</text></svg>' > AppDir/usr/share/icons/hicolor/scalable/apps/de.chords.Chords.svg
 
       - name: Build AppImage
         run: |
