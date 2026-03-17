@@ -31,7 +31,7 @@ impl Cache {
         Ok(cache)
     }
 
-    fn db_path() -> Result<PathBuf, CacheError> {
+    pub fn db_path() -> Result<PathBuf, CacheError> {
         let data_dir = dirs::data_dir()
             .ok_or_else(|| CacheError::Io("Could not determine data directory".into()))?;
         Ok(data_dir.join("chords").join("chords.db"))

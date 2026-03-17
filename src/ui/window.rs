@@ -567,12 +567,23 @@ impl Window {
             self.window.add_action(&shortcuts_action);
         }
 
+        // Print
+        {
+            let w = Rc::clone(self);
+            let print_action = gio::SimpleAction::new("print", None);
+            print_action.connect_activate(move |_, _| {
+                w.print_current_tab();
+            });
+            self.window.add_action(&print_action);
+        }
+
         // About
         {
             let window = self.window.clone();
+            let cache = self.cache.clone();
             let about_action = gio::SimpleAction::new("about", None);
             about_action.connect_activate(move |_, _| {
-                Self::show_about_dialog(&window);
+                Self::show_about_dialog(&window, &cache);
             });
             self.window.add_action(&about_action);
         }
@@ -625,16 +636,62 @@ impl Window {
         self.window.add_controller(sc);
     }
 
-    fn show_about_dialog(parent: &adw::ApplicationWindow) {
+    fn print_current_tab(self: &Rc<Self>) {
+        let tab = self.current_tab.borrow();
+        if tab.is_none() {
+            return;
+        }
+
+        let print_op = gtk::PrintOperation::new();
+        print_op.set_n_pages(1);
+
+        let lines = self.parsed_lines.borrow().clone();
+        let font_family = self.settings.font_family();
+        let font_size = self.settings.font_size();
+
+        print_op.connect_draw_page(move |_, ctx, _page_nr| {
+            let cr = ctx.cairo_context();
+            cr.set_source_rgb(0.0, 0.0, 0.0);
+            cr.set_font_size(font_size as f64);
+
+            let layout = ctx.create_pango_layout();
+            let font_desc = gtk::pango::FontDescription::from_string(
+                &format!("{} {}", font_family, font_size),
+            );
+            layout.set_font_description(Some(&font_desc));
+
+            let text: String = lines
+                .iter()
+                .map(|l| l.content.as_str())
+                .collect::<Vec<_>>()
+                .join("\n");
+            layout.set_text(&text);
+
+            pangocairo::functions::show_layout(&cr, &layout);
+        });
+
+        let _ = print_op.run(
+            gtk::PrintOperationAction::PrintDialog,
+            Some(&self.window),
+        );
+    }
+
+    fn show_about_dialog(parent: &adw::ApplicationWindow, _cache: &Arc<Cache>) {
+        let db_path = Cache::db_path()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| "unknown".to_string());
+
         let about = adw::AboutDialog::new();
         about.set_application_name("Chords");
         about.set_version("0.1.0");
         about.set_comments("A guitar chords viewer for GNOME");
         about.set_license_type(gtk::License::Gpl30);
         about.set_application_icon("emblem-music-symbolic");
-        about.set_website("https://github.com/example/chords");
+        about.set_website("https://github.com/bjesus/chords");
         about.set_developers(&["Chords Contributors"]);
-        about.set_copyright("© 2026 Chords Contributors");
+        about.set_copyright("\u{00a9} 2026 Chords Contributors");
+        about.set_debug_info(&format!("Database: {}", db_path));
+        about.set_debug_info_filename("chords-debug-info.txt");
         about.present(Some(parent));
     }
 

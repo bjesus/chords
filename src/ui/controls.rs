@@ -124,9 +124,10 @@ impl Controls {
         // ============================
         let menu = gtk::gio::Menu::new();
 
-        // Section 1: View toggles
+        // Section 1: View toggles + Print
         let view_section = gtk::gio::Menu::new();
         view_section.append(Some("Show Chord Diagrams"), Some("win.show-chord-diagrams"));
+        view_section.append(Some("Print\u{2026}"), Some("win.print"));
         menu.append_section(None, &view_section);
 
         // Section 2: Columns (radio)
