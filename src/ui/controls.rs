@@ -156,7 +156,7 @@ impl Controls {
         // Save button
         // ============================
         let save_button = gtk::ToggleButton::new();
-        save_button.set_icon_name("bookmark-new-symbolic");
+        save_button.set_icon_name("user-bookmarks-symbolic");
         save_button.set_tooltip_text(Some("Save to library"));
         save_button.add_css_class("flat");
 
