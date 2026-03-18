@@ -683,7 +683,7 @@ impl Window {
 
         let about = adw::AboutDialog::new();
         about.set_application_name("Chords");
-        about.set_version("0.1.0");
+        about.set_version("0.2.0");
         about.set_comments("A guitar chords viewer for GNOME");
         about.set_license_type(gtk::License::Gpl30);
         about.set_application_icon("de.chords.Chords");
