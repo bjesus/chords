@@ -1,5 +1,7 @@
 # Chords
 
+<img width="2080" height="1352" alt="Screenshot From 2026-03-18 08-19-59" src="https://github.com/user-attachments/assets/b6169067-9b24-419b-ab82-1e2a97309aae" />
+
 A native GNOME guitar chords viewer. Browse, search, and save guitar chord sheets with a clean, performant interface.
 
 Chords fetches tabs from [freetar.de](https://freetar.de) and renders them as plain monospace text — no web views, no bloat.
