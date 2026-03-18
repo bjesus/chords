@@ -19,8 +19,8 @@ pub struct Controls {
     // Hamburger menu (gio::Menu driven)
     pub menu_button: gtk::MenuButton,
 
-    // Save
-    pub save_button: gtk::Button,
+    // Save (toggle button — active = saved)
+    pub save_button: gtk::ToggleButton,
 
     // Callbacks (only for transpose and scroll — menu uses gio actions)
     transpose_up_cbs: Rc<RefCell<Vec<Box<dyn Fn()>>>>,
@@ -155,8 +155,9 @@ impl Controls {
         // ============================
         // Save button
         // ============================
-        let save_button = gtk::Button::from_icon_name("non-starred-symbolic");
-        save_button.set_tooltip_text(Some("Save / Unsave"));
+        let save_button = gtk::ToggleButton::new();
+        save_button.set_icon_name("bookmark-new-symbolic");
+        save_button.set_tooltip_text(Some("Save to library"));
         save_button.add_css_class("flat");
 
         // ============================
@@ -248,12 +249,11 @@ impl Controls {
     }
 
     pub fn update_save_state(&self, is_saved: bool) {
-        if is_saved {
-            self.save_button.set_icon_name("starred-symbolic");
-            self.save_button.set_tooltip_text(Some("Unsave"));
+        self.save_button.set_active(is_saved);
+        self.save_button.set_tooltip_text(Some(if is_saved {
+            "Remove from library"
         } else {
-            self.save_button.set_icon_name("non-starred-symbolic");
-            self.save_button.set_tooltip_text(Some("Save"));
-        }
+            "Save to library"
+        }));
     }
 }

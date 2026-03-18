@@ -29,7 +29,12 @@ fn main() {
         .application_id("de.chords.Chords")
         .build();
 
-    app.connect_activate(|app| {
+    app.connect_activate(move |app| {
+        // Register our icon directory so GTK can find de.chords.Chords icon
+        let icon_dir = format!("{}/data/icons", manifest_dir);
+        gtk4::IconTheme::for_display(&gtk4::gdk::Display::default().unwrap())
+            .add_search_path(&icon_dir);
+
         let cache = match Cache::open() {
             Ok(c) => Arc::new(c),
             Err(e) => {
