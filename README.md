@@ -18,7 +18,14 @@ Chords fetches tabs from [freetar.de](https://freetar.de) and renders them as pl
 - **Customizable** — Pick any monospace font, adjust size, choose highlight colors
 - **Responsive** — Sidebar collapses on narrow windows
 
-## Building
+## Installation
+
+- **Ubuntu/Debian** — download the `.deb` from [Releases](https://github.com/bjesus/chords/releases)
+- **Arch Linux** — install `chords` from the AUR
+- **Nix** — `nix run github:bjesus/chords`
+- **AppImage** — download from [Releases](https://github.com/bjesus/chords/releases)
+
+### Building from source
 
 Requires GTK4, libadwaita, and Rust.
 
