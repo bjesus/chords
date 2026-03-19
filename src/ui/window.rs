@@ -132,7 +132,7 @@ impl Window {
 
         // Empty state — use our app icon
         let empty_status = adw::StatusPage::new();
-        empty_status.set_icon_name(Some("de.chords.Chords"));
+        empty_status.set_icon_name(Some("io.github.bjesus.Chords"));
         empty_status.set_title("Chords");
         empty_status.set_description(Some(
             "Search for songs or select a saved chord from the sidebar",
@@ -680,7 +680,7 @@ impl Window {
         about.set_version("0.2.1");
         about.set_comments("A guitar chords viewer for GNOME");
         about.set_license_type(gtk::License::Gpl30);
-        about.set_application_icon("de.chords.Chords");
+        about.set_application_icon("io.github.bjesus.Chords");
         about.set_website("https://github.com/bjesus/chords");
         about.set_developers(&["Chords Contributors"]);
         about.set_copyright("\u{00a9} 2026 Chords Contributors");

@@ -26,11 +26,11 @@ fn main() {
     let _guard = rt.enter();
 
     let app = adw::Application::builder()
-        .application_id("de.chords.Chords")
+        .application_id("io.github.bjesus.Chords")
         .build();
 
     app.connect_activate(move |app| {
-        // Register our icon directory so GTK can find de.chords.Chords icon
+        // Register our icon directory so GTK can find io.github.bjesus.Chords icon
         let icon_dir = format!("{}/data/icons", manifest_dir);
         gtk4::IconTheme::for_display(&gtk4::gdk::Display::default().unwrap())
             .add_search_path(&icon_dir);

@@ -33,11 +33,11 @@
 
           postInstall = ''
             mkdir -p $out/share/glib-2.0/schemas
-            cp data/de.chords.Chords.gschema.xml $out/share/glib-2.0/schemas/
+            cp data/io.github.bjesus.Chords.gschema.xml $out/share/glib-2.0/schemas/
             glib-compile-schemas $out/share/glib-2.0/schemas/
 
             mkdir -p $out/share/applications
-            cat > $out/share/applications/de.chords.Chords.desktop << EOF
+            cat > $out/share/applications/io.github.bjesus.Chords.desktop << EOF
             [Desktop Entry]
             Name=Chords
             Comment=Guitar chords viewer

@@ -44,10 +44,10 @@ jobs:
         run: |
           mkdir -p pkg/DEBIAN pkg/usr/bin pkg/usr/share/glib-2.0/schemas pkg/usr/share/applications pkg/usr/share/icons/hicolor/scalable/apps
           cp target/release/chords pkg/usr/bin/
-          cp data/de.chords.Chords.gschema.xml pkg/usr/share/glib-2.0/schemas/
-          cp data/de.chords.Chords.svg pkg/usr/share/icons/hicolor/scalable/apps/
+          cp data/io.github.bjesus.Chords.gschema.xml pkg/usr/share/glib-2.0/schemas/
+          cp data/io.github.bjesus.Chords.svg pkg/usr/share/icons/hicolor/scalable/apps/
           VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
-          printf '[Desktop Entry]\nName=Chords\nComment=Guitar chords viewer\nExec=chords\nIcon=de.chords.Chords\nTerminal=false\nType=Application\nCategories=Audio;Music;\n' > pkg/usr/share/applications/de.chords.Chords.desktop
+          printf '[Desktop Entry]\nName=Chords\nComment=Guitar chords viewer\nExec=chords\nIcon=io.github.bjesus.Chords\nTerminal=false\nType=Application\nCategories=Audio;Music;\n' > pkg/usr/share/applications/io.github.bjesus.Chords.desktop
           printf 'Package: chords\nVersion: %s\nSection: sound\nPriority: optional\nArchitecture: amd64\nDepends: libgtk-4-1 (>= 4.10), libadwaita-1-0 (>= 1.5)\nMaintainer: bjesus <github@yoavmoshe.com>\nDescription: A native GNOME guitar chords viewer\n Browse, search, and save guitar chord sheets.\n' "$VERSION" > pkg/DEBIAN/control
           printf '#!/bin/sh\nglib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true\ngtk-update-icon-cache -qtf /usr/share/icons/hicolor 2>/dev/null || true\n' > pkg/DEBIAN/postinst
           chmod 755 pkg/DEBIAN/postinst
@@ -95,18 +95,18 @@ jobs:
         run: |
           mkdir -p AppDir/usr/bin AppDir/usr/share/glib-2.0/schemas AppDir/usr/share/applications AppDir/usr/share/icons/hicolor/scalable/apps
           cp target/release/chords AppDir/usr/bin/
-          cp data/de.chords.Chords.gschema.xml AppDir/usr/share/glib-2.0/schemas/
+          cp data/io.github.bjesus.Chords.gschema.xml AppDir/usr/share/glib-2.0/schemas/
           glib-compile-schemas AppDir/usr/share/glib-2.0/schemas/
-          printf '[Desktop Entry]\nName=Chords\nComment=Guitar chords viewer\nExec=chords\nIcon=de.chords.Chords\nTerminal=false\nType=Application\nCategories=Audio;Music;\n' > AppDir/usr/share/applications/de.chords.Chords.desktop
-          cp data/de.chords.Chords.svg AppDir/usr/share/icons/hicolor/scalable/apps/de.chords.Chords.svg
+          printf '[Desktop Entry]\nName=Chords\nComment=Guitar chords viewer\nExec=chords\nIcon=io.github.bjesus.Chords\nTerminal=false\nType=Application\nCategories=Audio;Music;\n' > AppDir/usr/share/applications/io.github.bjesus.Chords.desktop
+          cp data/io.github.bjesus.Chords.svg AppDir/usr/share/icons/hicolor/scalable/apps/io.github.bjesus.Chords.svg
 
       - name: Build AppImage
         run: |
           VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
           DEPLOY_GTK_VERSION=4 ./linuxdeploy-x86_64.AppImage \
             --appdir AppDir \
-            --desktop-file AppDir/usr/share/applications/de.chords.Chords.desktop \
-            --icon-file AppDir/usr/share/icons/hicolor/scalable/apps/de.chords.Chords.svg \
+            --desktop-file AppDir/usr/share/applications/io.github.bjesus.Chords.desktop \
+            --icon-file AppDir/usr/share/icons/hicolor/scalable/apps/io.github.bjesus.Chords.svg \
             --plugin gtk \
             --output appimage
           mv Chords-*.AppImage chords-${VERSION}-x86_64.AppImage || true

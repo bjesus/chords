@@ -1,7 +1,7 @@
 use gtk4::gio;
 use gtk4::prelude::*;
 
-const APP_ID: &str = "de.chords.Chords";
+const APP_ID: &str = "io.github.bjesus.Chords";
 
 /// Thin typed wrapper around GSettings.
 #[derive(Clone)]

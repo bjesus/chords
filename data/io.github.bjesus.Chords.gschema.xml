@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-  <schema id="de.chords.Chords" path="/de/chords/Chords/">
+  <schema id="io.github.bjesus.Chords" path="/io/github/bjesus/Chords/">
     <!-- Window state -->
     <key name="window-width" type="i">
       <default>1100</default>

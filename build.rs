@@ -23,5 +23,5 @@ fn main() {
         }
     }
 
-    println!("cargo:rerun-if-changed=data/de.chords.Chords.gschema.xml");
+    println!("cargo:rerun-if-changed=data/io.github.bjesus.Chords.gschema.xml");
 }
