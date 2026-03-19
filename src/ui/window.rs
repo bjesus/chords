@@ -180,16 +180,10 @@ impl Window {
         split_view.set_max_sidebar_width(280.0);
         split_view.set_show_sidebar(true);
 
-        // Bind sidebar toggle button to split view
+        // Bind sidebar toggle button to split view — always visible
         sidebar_button
             .bind_property("active", &split_view, "show-sidebar")
             .bidirectional()
-            .sync_create()
-            .build();
-
-        // Show sidebar button only when collapsed
-        split_view
-            .bind_property("collapsed", &sidebar_button, "visible")
             .sync_create()
             .build();
 
