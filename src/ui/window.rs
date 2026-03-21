@@ -344,6 +344,28 @@ impl Window {
             });
         }
 
+        // Auto-fill: when content size changes but still doesn't fill the viewport,
+        // load more pages without waiting for scroll
+        {
+            let w = Rc::clone(&win);
+            let vadj = self.search_results.scrolled_window.vadjustment();
+            vadj.connect_upper_notify(move |vadj| {
+                let page_size = vadj.page_size();
+                let upper = vadj.upper();
+                if upper > 0.0 && upper <= page_size + 1.0
+                    && w.has_search_results.get()
+                    && w.search_next_page.get() > 0
+                    && !w.search_is_fetching.get()
+                    && w.content_stack.visible_child_name().as_deref() == Some("search")
+                {
+                    let w = Rc::clone(&w);
+                    glib::spawn_future_local(async move {
+                        w.load_next_search_page(false).await;
+                    });
+                }
+            });
+        }
+
         // Sidebar saved tab clicked
         {
             let w = Rc::clone(&win);
@@ -903,13 +925,13 @@ impl Window {
 
     /// If the current search results don't fill the viewport, load the next page
     /// immediately (no delay) so the list is scrollable before requiring user action.
+    /// Uses a short timeout to let GTK finish layout before measuring.
     fn try_load_more_if_needed(self: &Rc<Self>) {
         if self.search_next_page.get() == 0 { return; }
 
         let win = Rc::clone(self);
-        glib::idle_add_local_once(move || {
+        glib::timeout_add_local_once(std::time::Duration::from_millis(150), move || {
             let vadj = win.search_results.scrolled_window.vadjustment();
-            // If content height ≤ viewport height, there's nothing to scroll — load more
             if vadj.upper() <= vadj.page_size() + 1.0
                 && win.search_next_page.get() > 0
                 && !win.search_is_fetching.get()
