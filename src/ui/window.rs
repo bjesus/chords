@@ -777,33 +777,68 @@ impl Window {
 
     pub fn perform_search(self: &Rc<Self>, query: String) {
         let win = Rc::clone(self);
+        win.search_results.clear();
         win.content_stack.set_visible_child_name("loading");
         win.set_controls_sensitive(false);
+        win.has_search_results.set(false);
+        win.back_button.set_visible(false);
+
+        const MAX_PAGES: u32 = 10;
 
         glib::spawn_future_local(async move {
-            match crate::data::api::search(&query, 1).await {
-                Ok(response) => {
-                    let count = response.results.len();
-                    win.search_results.set_results(&response.results);
-                    win.content_stack.set_visible_child_name("search");
-                    win.title_widget.set_title("Search Results");
-                    win.title_widget.set_subtitle(&format!(
-                        "{} results for \"{}\"", count, query
-                    ));
-                    win.has_search_results.set(count > 0);
-                    *win.search_query.borrow_mut() = query;
-                    win.search_result_count.set(count);
-                    win.search_scroll_pos.set(0.0);
-                    win.back_button.set_visible(false);
+            let mut all_groups: Vec<crate::data::models::SongGroup> = Vec::new();
+            let mut got_any = false;
+
+            for page in 1..=MAX_PAGES {
+                match crate::data::api::search(&query, page).await {
+                    Ok(response) => {
+                        if response.results.is_empty() {
+                            break;
+                        }
+                        got_any = true;
+                        crate::data::models::SongGroup::merge(
+                            &mut all_groups,
+                            response.results,
+                        );
+
+                        let is_last = page == MAX_PAGES;
+                        let count = all_groups.len();
+
+                        if page == 1 {
+                            // First page: switch to results view immediately
+                            win.search_results.set_groups(&all_groups);
+                            win.content_stack.set_visible_child_name("search");
+                        } else {
+                            win.search_results.update_groups(&all_groups);
+                        }
+
+                        win.title_widget.set_title("Search Results");
+                        win.title_widget.set_subtitle(&format!(
+                            "{} song{} for \"{}\"{}",
+                            count,
+                            if count == 1 { "" } else { "s" },
+                            query,
+                            if is_last { "" } else { "…" }
+                        ));
+                        win.search_results.set_loading_more(!is_last);
+                        win.has_search_results.set(true);
+                        *win.search_query.borrow_mut() = query.clone();
+                        win.search_result_count.set(count);
+                        win.search_scroll_pos.set(0.0);
+                    }
+                    Err(e) => {
+                        eprintln!("Search error on page {}: {}", page, e);
+                        break;
+                    }
                 }
-                Err(e) => {
-                    eprintln!("Search error: {}", e);
-                    win.content_stack.set_visible_child_name("empty");
-                    win.title_widget.set_title("Chords");
-                    win.title_widget.set_subtitle(&format!("Search failed: {}", e));
-                    win.has_search_results.set(false);
-                    win.back_button.set_visible(false);
-                }
+            }
+
+            win.search_results.set_loading_more(false);
+
+            if !got_any {
+                win.content_stack.set_visible_child_name("empty");
+                win.title_widget.set_title("Chords");
+                win.title_widget.set_subtitle(&format!("No results for \"{}\"", query));
             }
         });
     }
@@ -815,7 +850,12 @@ impl Window {
         let query = self.search_query.borrow().clone();
         let count = self.search_result_count.get();
         self.title_widget.set_title("Search Results");
-        self.title_widget.set_subtitle(&format!("{} results for \"{}\"", count, query));
+        self.title_widget.set_subtitle(&format!(
+            "{} song{} for \"{}\"",
+            count,
+            if count == 1 { "" } else { "s" },
+            query
+        ));
         self.back_button.set_visible(false);
         self.set_controls_sensitive(false);
 

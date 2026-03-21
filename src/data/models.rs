@@ -128,6 +128,47 @@ pub struct ParsedLine {
     pub chords: Vec<ChordPosition>,
 }
 
+/// A group of search results for the same song, with multiple versions/types.
+#[derive(Debug, Clone)]
+pub struct SongGroup {
+    pub artist_name: String,
+    pub song_name: String,
+    /// All versions, sorted best-rated first.
+    pub versions: Vec<SearchResult>,
+}
+
+impl SongGroup {
+    /// The best version to show as the primary (first after sorting).
+    pub fn best(&self) -> &SearchResult {
+        &self.versions[0]
+    }
+
+    /// Merge new results into an existing list of groups.
+    pub fn merge(groups: &mut Vec<SongGroup>, new_results: Vec<SearchResult>) {
+        for result in new_results {
+            let pos = groups.iter().position(|g| {
+                g.artist_name == result.artist_name && g.song_name == result.song_name
+            });
+            if let Some(i) = pos {
+                // Check for exact duplicate (same URL) before adding
+                if !groups[i].versions.iter().any(|v| v.tab_url == result.tab_url) {
+                    groups[i].versions.push(result);
+                    // Re-sort: best rating first
+                    groups[i].versions.sort_by(|a, b| {
+                        b.rating.partial_cmp(&a.rating).unwrap_or(std::cmp::Ordering::Equal)
+                    });
+                }
+            } else {
+                groups.push(SongGroup {
+                    artist_name: result.artist_name.clone(),
+                    song_name: result.song_name.clone(),
+                    versions: vec![result],
+                });
+            }
+        }
+    }
+}
+
 /// Summary info for a saved tab (sidebar display).
 #[derive(Debug, Clone)]
 pub struct SavedTabSummary {
