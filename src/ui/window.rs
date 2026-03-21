@@ -45,6 +45,11 @@ pub struct Window {
     search_query: Rc<RefCell<String>>,
     search_result_count: Rc<Cell<usize>>,
     search_scroll_pos: Rc<Cell<f64>>,
+
+    // Infinite-scroll pagination state
+    search_next_page: Rc<Cell<u32>>,
+    search_is_fetching: Rc<Cell<bool>>,
+    search_groups: Rc<RefCell<Vec<crate::data::models::SongGroup>>>,
 }
 
 impl Window {
@@ -258,6 +263,9 @@ impl Window {
             search_query: Rc::new(RefCell::new(String::new())),
             search_result_count: Rc::new(Cell::new(0)),
             search_scroll_pos: Rc::new(Cell::new(0.0)),
+            search_next_page: Rc::new(Cell::new(0)),
+            search_is_fetching: Rc::new(Cell::new(false)),
+            search_groups: Rc::new(RefCell::new(Vec::new())),
         });
 
         win.apply_settings();
@@ -320,6 +328,19 @@ impl Window {
                 let vadj = w.search_results.scrolled_window.vadjustment();
                 w.search_scroll_pos.set(vadj.value());
                 w.load_tab(url);
+            });
+        }
+
+        // Infinite scroll: load next page when user reaches the bottom
+        {
+            let w = Rc::clone(&win);
+            self.search_results.scrolled_window.connect_edge_reached(move |_, pos| {
+                if pos == gtk::PositionType::Bottom {
+                    let w = Rc::clone(&w);
+                    glib::spawn_future_local(async move {
+                        w.load_next_search_page(true).await;
+                    });
+                }
             });
         }
 
@@ -776,69 +797,126 @@ impl Window {
     }
 
     pub fn perform_search(self: &Rc<Self>, query: String) {
+        // Reset all pagination state for a fresh search
+        self.search_results.clear();
+        self.search_results.set_loading_more(false);
+        self.content_stack.set_visible_child_name("loading");
+        self.set_controls_sensitive(false);
+        self.has_search_results.set(false);
+        self.back_button.set_visible(false);
+        self.search_next_page.set(1);
+        self.search_is_fetching.set(false);
+        *self.search_groups.borrow_mut() = Vec::new();
+        *self.search_query.borrow_mut() = query.clone();
+        self.search_scroll_pos.set(0.0);
+
+        // Fetch the first page immediately (no delay)
         let win = Rc::clone(self);
-        win.search_results.clear();
-        win.content_stack.set_visible_child_name("loading");
-        win.set_controls_sensitive(false);
-        win.has_search_results.set(false);
-        win.back_button.set_visible(false);
-
-        const MAX_PAGES: u32 = 10;
-
         glib::spawn_future_local(async move {
-            let mut all_groups: Vec<crate::data::models::SongGroup> = Vec::new();
-            let mut got_any = false;
+            win.load_next_search_page(false).await;
+        });
+    }
 
-            for page in 1..=MAX_PAGES {
-                match crate::data::api::search(&query, page).await {
-                    Ok(response) => {
-                        if response.results.is_empty() {
-                            break;
-                        }
-                        got_any = true;
-                        crate::data::models::SongGroup::merge(
-                            &mut all_groups,
-                            response.results,
-                        );
+    /// Fetch and merge the next page of results.
+    /// `delay`: if true, wait 3 seconds first (courtesy delay for scroll-triggered loads).
+    async fn load_next_search_page(self: &Rc<Self>, delay: bool) {
+        // Guards
+        if self.search_is_fetching.get() { return; }
+        let page = self.search_next_page.get();
+        if page == 0 { return; } // exhausted
 
-                        let is_last = page == MAX_PAGES;
-                        let count = all_groups.len();
+        self.search_is_fetching.set(true);
+        self.search_results.set_loading_more(true);
 
-                        if page == 1 {
-                            // First page: switch to results view immediately
-                            win.search_results.set_groups(&all_groups);
-                            win.content_stack.set_visible_child_name("search");
-                        } else {
-                            win.search_results.update_groups(&all_groups);
-                        }
-
-                        win.title_widget.set_title("Search Results");
-                        win.title_widget.set_subtitle(&format!(
-                            "{} song{} for \"{}\"{}",
-                            count,
-                            if count == 1 { "" } else { "s" },
-                            query,
-                            if is_last { "" } else { "…" }
-                        ));
-                        win.search_results.set_loading_more(!is_last);
-                        win.has_search_results.set(true);
-                        *win.search_query.borrow_mut() = query.clone();
-                        win.search_result_count.set(count);
-                        win.search_scroll_pos.set(0.0);
-                    }
-                    Err(e) => {
-                        eprintln!("Search error on page {}: {}", page, e);
-                        break;
-                    }
-                }
+        if delay {
+            glib::timeout_future(std::time::Duration::from_secs(3)).await;
+            // Re-check guards after sleep (user may have started a new search)
+            if self.search_next_page.get() != page {
+                self.search_is_fetching.set(false);
+                return;
             }
+        }
 
-            win.search_results.set_loading_more(false);
+        let query = self.search_query.borrow().clone();
 
-            if !got_any {
-                win.content_stack.set_visible_child_name("empty");
-                win.title_widget.set_title("Chords");
-                win.title_widget.set_subtitle(&format!("No results for \"{}\"", query));
+        match crate::data::api::search(&query, page).await {
+            Ok(response) => {
+                if response.results.is_empty() {
+                    // No more pages
+                    self.search_next_page.set(0);
+                    self.search_results.set_loading_more(false);
+                    self.search_is_fetching.set(false);
+                    // Update subtitle to remove the trailing "…"
+                    let count = self.search_result_count.get();
+                    self.title_widget.set_subtitle(&format!(
+                        "{} song{} for \"{}\"",
+                        count,
+                        if count == 1 { "" } else { "s" },
+                        query
+                    ));
+                    return;
+                }
+
+                // Merge into accumulated groups
+                {
+                    let mut groups = self.search_groups.borrow_mut();
+                    crate::data::models::SongGroup::merge(&mut groups, response.results);
+                }
+                let snapshot = self.search_groups.borrow().clone();
+                let count = snapshot.len();
+
+                if page == 1 {
+                    self.search_results.set_groups(&snapshot);
+                    self.content_stack.set_visible_child_name("search");
+                    self.has_search_results.set(true);
+                } else {
+                    self.search_results.update_groups(&snapshot);
+                }
+
+                self.title_widget.set_title("Search Results");
+                self.title_widget.set_subtitle(&format!(
+                    "{} song{} for \"{}\"…",
+                    count,
+                    if count == 1 { "" } else { "s" },
+                    query
+                ));
+                self.search_result_count.set(count);
+                self.search_next_page.set(page + 1);
+                self.search_results.set_loading_more(false);
+                self.search_is_fetching.set(false);
+
+                // If results don't fill the viewport, load another page immediately
+                self.try_load_more_if_needed();
+            }
+            Err(e) => {
+                eprintln!("Search page {} error: {}", page, e);
+                if page == 1 {
+                    self.content_stack.set_visible_child_name("empty");
+                    self.title_widget.set_title("Chords");
+                    self.title_widget.set_subtitle(&format!("Search failed: {}", e));
+                }
+                self.search_results.set_loading_more(false);
+                self.search_is_fetching.set(false);
+            }
+        }
+    }
+
+    /// If the current search results don't fill the viewport, load the next page
+    /// immediately (no delay) so the list is scrollable before requiring user action.
+    fn try_load_more_if_needed(self: &Rc<Self>) {
+        if self.search_next_page.get() == 0 { return; }
+
+        let win = Rc::clone(self);
+        glib::idle_add_local_once(move || {
+            let vadj = win.search_results.scrolled_window.vadjustment();
+            // If content height ≤ viewport height, there's nothing to scroll — load more
+            if vadj.upper() <= vadj.page_size() + 1.0
+                && win.search_next_page.get() > 0
+                && !win.search_is_fetching.get()
+            {
+                glib::spawn_future_local(async move {
+                    win.load_next_search_page(false).await;
+                });
             }
         });
     }
