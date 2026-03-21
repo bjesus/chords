@@ -344,26 +344,35 @@ impl Window {
             });
         }
 
-        // Auto-fill: when content size changes but still doesn't fill the viewport,
-        // load more pages without waiting for scroll
+        // Auto-fill: watch both upper and page-size changes on the vadjustment.
+        // When the search view is visible and content doesn't fill the viewport,
+        // load more pages. This covers initial mapping, window resizes, and
+        // content changes.
         {
-            let w = Rc::clone(&win);
             let vadj = self.search_results.scrolled_window.vadjustment();
-            vadj.connect_upper_notify(move |vadj| {
-                let page_size = vadj.page_size();
-                let upper = vadj.upper();
-                if upper > 0.0 && upper <= page_size + 1.0
-                    && w.has_search_results.get()
-                    && w.search_next_page.get() > 0
-                    && !w.search_is_fetching.get()
-                    && w.content_stack.visible_child_name().as_deref() == Some("search")
-                {
-                    let w = Rc::clone(&w);
-                    glib::spawn_future_local(async move {
-                        w.load_next_search_page(false).await;
-                    });
+            let make_handler = |w: Rc<Self>| {
+                move |vadj: &gtk::Adjustment| {
+                    let page_size = vadj.page_size();
+                    let upper = vadj.upper();
+                    // Only trigger when the widget is actually allocated (page_size > 0)
+                    if page_size > 0.0
+                        && upper <= page_size + 1.0
+                        && w.has_search_results.get()
+                        && w.search_next_page.get() > 0
+                        && !w.search_is_fetching.get()
+                        && w.content_stack.visible_child_name().as_deref() == Some("search")
+                    {
+                        let w = Rc::clone(&w);
+                        glib::spawn_future_local(async move {
+                            w.load_next_search_page(false).await;
+                        });
+                    }
                 }
-            });
+            };
+            let w1 = Rc::clone(&win);
+            let w2 = Rc::clone(&win);
+            vadj.connect_upper_notify(make_handler(w1));
+            vadj.connect_page_size_notify(make_handler(w2));
         }
 
         // Sidebar saved tab clicked
@@ -925,22 +934,29 @@ impl Window {
 
     /// If the current search results don't fill the viewport, load the next page
     /// immediately (no delay) so the list is scrollable before requiring user action.
-    /// Uses a short timeout to let GTK finish layout before measuring.
+    /// Checks at multiple intervals to handle layout settling.
     fn try_load_more_if_needed(self: &Rc<Self>) {
         if self.search_next_page.get() == 0 { return; }
 
-        let win = Rc::clone(self);
-        glib::timeout_add_local_once(std::time::Duration::from_millis(150), move || {
-            let vadj = win.search_results.scrolled_window.vadjustment();
-            if vadj.upper() <= vadj.page_size() + 1.0
-                && win.search_next_page.get() > 0
-                && !win.search_is_fetching.get()
-            {
-                glib::spawn_future_local(async move {
-                    win.load_next_search_page(false).await;
-                });
-            }
-        });
+        // Check at 200ms and 500ms to catch layout settling
+        for delay_ms in [200, 500] {
+            let win = Rc::clone(self);
+            glib::timeout_add_local_once(
+                std::time::Duration::from_millis(delay_ms),
+                move || {
+                    let vadj = win.search_results.scrolled_window.vadjustment();
+                    if vadj.page_size() > 0.0
+                        && vadj.upper() <= vadj.page_size() + 1.0
+                        && win.search_next_page.get() > 0
+                        && !win.search_is_fetching.get()
+                    {
+                        glib::spawn_future_local(async move {
+                            win.load_next_search_page(false).await;
+                        });
+                    }
+                },
+            );
+        }
     }
 
     fn go_back_to_results(self: &Rc<Self>) {
