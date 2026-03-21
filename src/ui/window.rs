@@ -367,16 +367,19 @@ impl Window {
         // Auto-scroll toggle
         {
             let tv = self.tab_view.clone();
+            let w = self.window.clone();
             self.controls.connect_scroll_toggle(move |active| {
-                if active { tv.start_autoscroll(); } else { tv.stop_autoscroll(); }
+                if active { tv.start_autoscroll(w.upcast_ref()); }
+                else { tv.stop_autoscroll(w.upcast_ref()); }
             });
         }
 
         // Scroll speed
         {
             let tv = self.tab_view.clone();
+            let w = self.window.clone();
             self.controls.connect_scroll_speed_changed(move |ms| {
-                tv.set_scroll_speed(ms as u32);
+                tv.set_scroll_speed(ms as u32, w.upcast_ref());
             });
         }
 

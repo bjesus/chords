@@ -23,6 +23,7 @@ pub struct TabView {
     column_count: Rc<Cell<i32>>,
     scroll_speed_ms: Rc<Cell<u32>>,
     scroll_source_id: Rc<std::cell::RefCell<Option<glib::SourceId>>>,
+    inhibit_cookie: Rc<Cell<Option<u32>>>,
     css_provider: gtk::CssProvider,
 }
 
@@ -58,6 +59,7 @@ impl TabView {
             column_count: Rc::new(Cell::new(1)),
             scroll_speed_ms: Rc::new(Cell::new(500)),
             scroll_source_id: Rc::new(std::cell::RefCell::new(None)),
+            inhibit_cookie: Rc::new(Cell::new(None)),
             css_provider,
         };
 
@@ -268,13 +270,23 @@ impl TabView {
     }
 
     // --- Auto-scroll ---
-    pub fn start_autoscroll(&self) {
-        self.stop_autoscroll();
+    pub fn start_autoscroll(&self, window: &gtk4::Window) {
+        self.stop_autoscroll(window);
 
         // Don't start if there's nothing to scroll
         let vadj = self.scrolled_window.vadjustment();
         if vadj.upper() <= vadj.page_size() {
             return;
+        }
+
+        // Inhibit idle/screensaver while scrolling
+        if let Some(app) = window.application() {
+            let cookie =                 app.inhibit(
+                Some(window),
+                gtk::ApplicationInhibitFlags::IDLE,
+                Some("Auto-scroll is active"),
+            );
+            self.inhibit_cookie.set(Some(cookie));
         }
 
         let scrolled = self.scrolled_window.clone();
@@ -298,16 +310,22 @@ impl TabView {
         *self.scroll_source_id.borrow_mut() = Some(source_id);
     }
 
-    pub fn stop_autoscroll(&self) {
+    pub fn stop_autoscroll(&self, window: &gtk4::Window) {
         if let Some(source_id) = self.scroll_source_id.borrow_mut().take() {
             source_id.remove();
         }
+        // Release the screen inhibition
+        if let Some(cookie) = self.inhibit_cookie.take() {
+            if let Some(app) = window.application() {
+                app.uninhibit(cookie);
+            }
+        }
     }
 
-    pub fn set_scroll_speed(&self, ms: u32) {
+    pub fn set_scroll_speed(&self, ms: u32, window: &gtk4::Window) {
         self.scroll_speed_ms.set(ms.max(10));
         if self.scroll_source_id.borrow().is_some() {
-            self.start_autoscroll();
+            self.start_autoscroll(window);
         }
     }
 
