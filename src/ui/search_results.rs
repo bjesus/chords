@@ -117,15 +117,28 @@ impl SearchResultsView {
         let best_url = best.tab_url.clone();
 
         if group.versions.len() == 1 {
-            // Single version — plain ActionRow
+            // Single version — plain ActionRow with open arrow
             let row = adw::ActionRow::new();
             row.set_title(&group.song_name);
             row.set_subtitle(&group.artist_name);
             row.add_css_class("search-result-row");
 
+            let open_btn = gtk::Button::from_icon_name("go-next-symbolic");
+            open_btn.add_css_class("flat");
+            open_btn.set_valign(gtk::Align::Center);
+            row.add_prefix(&open_btn);
+
             let suffix = Self::version_suffix(best);
             row.add_suffix(&suffix);
             row.set_activatable(true);
+
+            {
+                let cbs = Rc::clone(&callbacks);
+                let url = best_url.clone();
+                open_btn.connect_clicked(move |_| {
+                    for cb in cbs.borrow().iter() { cb(url.clone()); }
+                });
+            }
 
             row.connect_activated(move |_| {
                 for cb in callbacks.borrow().iter() {
@@ -138,19 +151,22 @@ impl SearchResultsView {
             // Multiple versions — ExpanderRow with best version as primary action
             let expander = adw::ExpanderRow::new();
             expander.set_title(&group.song_name);
-            expander.set_subtitle(&group.artist_name);
             expander.add_css_class("search-result-row");
 
-            // Best version suffix + an open button (both in the suffix area)
-            let best_suffix = Self::version_suffix(best);
-            expander.add_suffix(&best_suffix);
+            let other_count = group.versions.len() - 1;
+            expander.set_subtitle(&format!(
+                "{} · {} other version{}",
+                group.artist_name,
+                other_count,
+                if other_count == 1 { "" } else { "s" }
+            ));
 
-            // Open button in suffix — opens best version without expanding
-            let open_btn = gtk::Button::from_icon_name("media-playback-start-symbolic");
-            open_btn.set_tooltip_text(Some("Open best version"));
+            // Open button on the LEFT (prefix) — opens best version without expanding
+            let open_btn = gtk::Button::from_icon_name("go-next-symbolic");
+            open_btn.set_tooltip_text(Some("Open top version"));
             open_btn.add_css_class("flat");
             open_btn.set_valign(gtk::Align::Center);
-            expander.add_suffix(&open_btn);
+            expander.add_prefix(&open_btn);
 
             {
                 let cbs = Rc::clone(&self.activated_callbacks);
@@ -160,18 +176,11 @@ impl SearchResultsView {
                 });
             }
 
-            // Sub-rows for each alternative version
-            let other_count = group.versions.len() - 1;
-            let count_label_text = format!(
-                "{} other version{}",
-                other_count,
-                if other_count == 1 { "" } else { "s" }
-            );
-            expander.set_subtitle(&format!(
-                "{} · {}",
-                group.artist_name, count_label_text
-            ));
+            // Best version info in suffix
+            let best_suffix = Self::version_suffix(best);
+            expander.add_suffix(&best_suffix);
 
+            // Sub-rows for each version
             for version in group.versions.iter() {
                 let sub = self.create_version_subrow(version);
                 expander.add_row(&sub);
@@ -210,17 +219,18 @@ impl SearchResultsView {
         let b = gtk::Box::new(gtk::Orientation::Horizontal, 6);
         b.set_valign(gtk::Align::Center);
 
-        if result.votes > 0 {
-            let rating = gtk::Label::new(Some(&format!("{}", result.rating)));
-            rating.add_css_class("dim-label");
-            rating.add_css_class("caption");
-            b.append(&rating);
-        }
-
         let type_label = gtk::Label::new(Some(result.tab_type.display_name()));
         type_label.add_css_class("caption");
         type_label.add_css_class("dim-label");
         b.append(&type_label);
+
+        if result.votes > 0 {
+            let rating_text = format!("{}  ({} votes)", result.rating, result.votes);
+            let rating = gtk::Label::new(Some(&rating_text));
+            rating.add_css_class("dim-label");
+            rating.add_css_class("caption");
+            b.append(&rating);
+        }
 
         b
     }

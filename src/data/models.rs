@@ -133,7 +133,7 @@ pub struct ParsedLine {
 pub struct SongGroup {
     pub artist_name: String,
     pub song_name: String,
-    /// All versions, sorted best-rated first.
+    /// All versions, sorted by most votes first.
     pub versions: Vec<SearchResult>,
 }
 
@@ -153,9 +153,10 @@ impl SongGroup {
                 // Check for exact duplicate (same URL) before adding
                 if !groups[i].versions.iter().any(|v| v.tab_url == result.tab_url) {
                     groups[i].versions.push(result);
-                    // Re-sort: best rating first
+                    // Re-sort: most votes first (tiebreak by rating)
                     groups[i].versions.sort_by(|a, b| {
-                        b.rating.partial_cmp(&a.rating).unwrap_or(std::cmp::Ordering::Equal)
+                        b.votes.cmp(&a.votes)
+                            .then_with(|| b.rating.partial_cmp(&a.rating).unwrap_or(std::cmp::Ordering::Equal))
                     });
                 }
             } else {
