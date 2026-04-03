@@ -221,7 +221,7 @@ impl TabView {
             let text_view = Self::make_text_view(&buffer, self.transpose_steps.clone());
             text_view.set_direction(direction);
 
-            Self::render_lines_into_buffer(&buffer, chunk);
+            Self::render_lines_into_buffer(&buffer, chunk, direction);
 
             // Add a separator between columns
             if i > 0 {
@@ -251,13 +251,25 @@ impl TabView {
         lines.chunks(chunk_size).map(|c| c.to_vec()).collect()
     }
 
-    fn render_lines_into_buffer(buffer: &gtk::TextBuffer, lines: &[ParsedLine]) {
+    fn render_lines_into_buffer(
+        buffer: &gtk::TextBuffer,
+        lines: &[ParsedLine],
+        direction: gtk::TextDirection,
+    ) {
         buffer.set_text("");
         let mut iter = buffer.start_iter();
+        // Right-to-Left Mark: forces Pango to treat the paragraph as RTL
+        let rtl = direction == gtk::TextDirection::Rtl;
 
         for (i, line) in lines.iter().enumerate() {
             if i > 0 {
                 buffer.insert(&mut iter, "\n");
+            }
+
+            // Prepend RLM to every non-empty line so chord lines (pure ASCII)
+            // also get RTL base direction and align with the Hebrew lyrics
+            if rtl && line.kind != LineKind::Empty {
+                buffer.insert(&mut iter, "\u{200F}");
             }
 
             match line.kind {
