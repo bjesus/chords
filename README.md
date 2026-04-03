@@ -24,6 +24,7 @@ Chords fetches tabs from [freetar.de](https://freetar.de) and renders them as pl
 - **Arch Linux** — install `chords` from the AUR
 - **Nix** — `nix run github:bjesus/chords`
 - **AppImage** — download from [Releases](https://github.com/bjesus/chords/releases)
+- **Windows** — download the `.zip` from [Releases](https://github.com/bjesus/chords/releases), extract, and run `chords.exe`
 
 ### Building from source
 

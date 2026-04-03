@@ -117,9 +117,93 @@ jobs:
           name: chords-appimage
           path: chords-*.AppImage
 
+  build-windows:
+    runs-on: windows-2022
+    env:
+      GVSBUILD_VERSION: "2024.12.0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache GTK
+        uses: actions/cache@v4
+        id: cache-gtk
+        with:
+          path: C:\gtk
+          key: windows-gtk-${{ env.GVSBUILD_VERSION }}
+
+      - name: Download GTK
+        if: steps.cache-gtk.outputs.cache-hit != 'true'
+        run: |
+          Invoke-WebRequest -Uri "https://github.com/wingtk/gvsbuild/releases/download/$env:GVSBUILD_VERSION/GTK4_Gvsbuild_$($env:GVSBUILD_VERSION)_x64.zip" -OutFile gtk.zip
+          7z x gtk.zip -oC:\gtk -y
+
+      - name: Setup environment
+        run: |
+          echo "C:\gtk\bin" >> $env:GITHUB_PATH
+          echo "PKG_CONFIG_PATH=C:\gtk\lib\pkgconfig" >> $env:GITHUB_ENV
+          echo "LIB=C:\gtk\lib" >> $env:GITHUB_ENV
+          echo "INCLUDE=C:\gtk\include" >> $env:GITHUB_ENV
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable-msvc
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\.cargo\registry
+            ~\.cargo\git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Run tests
+        run: cargo test --release --bin chords
+
+      - name: Package Windows zip
+        shell: bash
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          mkdir -p bundle/share/glib-2.0/schemas bundle/share/icons/hicolor/scalable/apps
+
+          # Binary
+          cp target/release/chords.exe bundle/
+
+          # GTK DLLs — copy all DLLs from gvsbuild bin
+          cp /c/gtk/bin/*.dll bundle/
+
+          # GSettings schema
+          cp data/io.github.bjesus.Chords.gschema.xml bundle/share/glib-2.0/schemas/
+          /c/gtk/bin/glib-compile-schemas.exe bundle/share/glib-2.0/schemas/
+
+          # Icon
+          cp data/io.github.bjesus.Chords.svg bundle/share/icons/hicolor/scalable/apps/
+
+          # Adwaita icons (needed for symbolic icons)
+          cp -r /c/gtk/share/icons/Adwaita bundle/share/icons/ 2>/dev/null || true
+          cp -r /c/gtk/share/icons/hicolor/index.theme bundle/share/icons/hicolor/ 2>/dev/null || true
+
+          # GDK pixbuf loaders
+          mkdir -p bundle/lib/gdk-pixbuf-2.0
+          cp -r /c/gtk/lib/gdk-pixbuf-2.0/* bundle/lib/gdk-pixbuf-2.0/ 2>/dev/null || true
+
+          # Create zip
+          cd bundle
+          7z a -tzip "../chords_${VERSION}_windows_x64.zip" .
+
+      - name: Upload Windows zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: chords-windows
+          path: chords_*_windows_x64.zip
+
   release:
     if: github.event_name == 'release'
-    needs: [build-ubuntu, build-appimage]
+    needs: [build-ubuntu, build-appimage, build-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -133,3 +217,4 @@ jobs:
           files: |
             chords-deb/*.deb
             chords-appimage/*.AppImage
+            chords-windows/*.zip
