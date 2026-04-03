@@ -158,9 +158,48 @@ impl TabView {
         self.rebuild_columns();
     }
 
+    /// Detect whether the lyrics are predominantly RTL (Hebrew, Arabic, etc.).
+    fn detect_direction(lines: &[ParsedLine]) -> gtk::TextDirection {
+        let mut rtl_chars: usize = 0;
+        let mut ltr_chars: usize = 0;
+
+        for line in lines {
+            if line.kind != LineKind::LyricLine {
+                continue;
+            }
+            for ch in line.content.chars() {
+                if ch.is_alphabetic() {
+                    // Unicode RTL ranges: Hebrew (0590-05FF), Arabic (0600-06FF, 0750-077F),
+                    // and other RTL scripts
+                    let cp = ch as u32;
+                    if (0x0590..=0x05FF).contains(&cp)     // Hebrew
+                        || (0x0600..=0x06FF).contains(&cp)  // Arabic
+                        || (0x0750..=0x077F).contains(&cp)  // Arabic Supplement
+                        || (0xFB50..=0xFDFF).contains(&cp)  // Arabic Presentation Forms-A
+                        || (0xFE70..=0xFEFF).contains(&cp)
+                    // Arabic Presentation Forms-B
+                    {
+                        rtl_chars += 1;
+                    } else {
+                        ltr_chars += 1;
+                    }
+                }
+            }
+        }
+
+        if rtl_chars > ltr_chars {
+            gtk::TextDirection::Rtl
+        } else {
+            gtk::TextDirection::Ltr
+        }
+    }
+
     fn rebuild_columns(&self) {
         let cols = self.column_count.get().max(1) as usize;
         let lines = self.lines_cache.borrow();
+
+        // Detect text direction from lyrics
+        let direction = Self::detect_direction(&lines);
 
         // Remove all existing text views from columns_box
         while let Some(child) = self.columns_box.first_child() {
@@ -180,6 +219,7 @@ impl TabView {
             let buffer = gtk::TextBuffer::new(None);
             Self::create_tags(&buffer, &cc, &sc);
             let text_view = Self::make_text_view(&buffer, self.transpose_steps.clone());
+            text_view.set_direction(direction);
 
             Self::render_lines_into_buffer(&buffer, chunk);
 
