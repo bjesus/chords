@@ -300,10 +300,10 @@ impl Sidebar {
         label.add_css_class("caption");
         label.add_css_class("dim-label");
 
-        let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+        let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 8);
         hbox.set_margin_top(8);
         hbox.set_margin_bottom(2);
-        hbox.set_margin_start(8);
+        hbox.set_margin_start(0);
         hbox.set_margin_end(8);
         hbox.append(&avatar);
         hbox.append(&label);
