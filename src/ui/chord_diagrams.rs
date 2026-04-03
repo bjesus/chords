@@ -119,6 +119,10 @@ impl ChordDiagramPanel {
     }
 
     fn draw_diagram(cr: &gtk::cairo::Context, w: f64, h: f64, voicing: &Voicing) {
+        // Opaque background so the diagram is readable on any tooltip/surface
+        cr.set_source_rgb(1.0, 1.0, 1.0);
+        cr.paint().ok();
+
         let num_strings = 6;
         let num_frets = 5;
         let margin_top = 14.0;
@@ -230,7 +234,28 @@ impl ChordDiagramPanel {
 /// Returns None if the chord isn't in the database.
 pub fn chord_tooltip_widget(chord_name: &str) -> Option<gtk::Box> {
     let voicing = chord_db::get_voicing(chord_name)?;
-    Some(ChordDiagramPanel::create_diagram(chord_name, &voicing))
+
+    let container = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    container.set_margin_top(4);
+    container.set_margin_bottom(4);
+    container.set_margin_start(4);
+    container.set_margin_end(4);
+
+    let label = gtk::Label::new(Some(chord_name));
+    label.add_css_class("heading");
+    container.append(&label);
+
+    let drawing = gtk::DrawingArea::new();
+    drawing.set_content_width(80);
+    drawing.set_content_height(100);
+
+    let v = voicing;
+    drawing.set_draw_func(move |_, cr, width, height| {
+        ChordDiagramPanel::draw_diagram(cr, width as f64, height as f64, &v);
+    });
+
+    container.append(&drawing);
+    Some(container)
 }
 
 /// Transpose a full chord name like "Am7" or "F#m" by semitone steps.
