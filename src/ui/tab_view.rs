@@ -154,10 +154,7 @@ impl TabView {
 
         let total = lines.len();
         let chunk_size = (total + cols - 1) / cols;
-        lines
-            .chunks(chunk_size)
-            .map(|c| c.to_vec())
-            .collect()
+        lines.chunks(chunk_size).map(|c| c.to_vec()).collect()
     }
 
     fn render_lines_into_buffer(buffer: &gtk::TextBuffer, lines: &[ParsedLine]) {
@@ -281,7 +278,7 @@ impl TabView {
 
         // Inhibit idle/screensaver while scrolling
         if let Some(app) = window.application() {
-            let cookie =                 app.inhibit(
+            let cookie = app.inhibit(
                 Some(window),
                 gtk::ApplicationInhibitFlags::IDLE,
                 Some("Auto-scroll is active"),
@@ -291,10 +288,10 @@ impl TabView {
 
         let scrolled = self.scrolled_window.clone();
         let speed = self.scroll_speed_ms.get();
+        let source_id_ref = self.scroll_source_id.clone();
 
-        let source_id = glib::timeout_add_local(
-            std::time::Duration::from_millis(speed as u64),
-            move || {
+        let source_id =
+            glib::timeout_add_local(std::time::Duration::from_millis(speed as u64), move || {
                 let vadj = scrolled.vadjustment();
                 let current = vadj.value();
                 let upper = vadj.upper() - vadj.page_size();
@@ -302,10 +299,12 @@ impl TabView {
                     vadj.set_value(current + 1.0);
                     glib::ControlFlow::Continue
                 } else {
+                    // Timer ended naturally — clear stored ID so stop_autoscroll
+                    // won't try to remove an already-dead source
+                    *source_id_ref.borrow_mut() = None;
                     glib::ControlFlow::Break
                 }
-            },
-        );
+            });
 
         *self.scroll_source_id.borrow_mut() = Some(source_id);
     }

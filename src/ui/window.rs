@@ -1011,6 +1011,9 @@ impl Window {
     }
 
     fn display_tab(self: &Rc<Self>, tab: TabData) {
+        // Stop auto-scroll if active (resets button, timer, and screen inhibit)
+        self.controls.scroll_button.set_active(false);
+
         self.transpose_steps.set(0);
         self.controls.update_transpose_label(0);
 
