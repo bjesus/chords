@@ -226,8 +226,15 @@ impl ChordDiagramPanel {
     }
 }
 
+/// Create a small chord diagram widget suitable for use as a tooltip.
+/// Returns None if the chord isn't in the database.
+pub fn chord_tooltip_widget(chord_name: &str) -> Option<gtk::Box> {
+    let voicing = chord_db::get_voicing(chord_name)?;
+    Some(ChordDiagramPanel::create_diagram(chord_name, &voicing))
+}
+
 /// Transpose a full chord name like "Am7" or "F#m" by semitone steps.
-fn transpose_chord_name(name: &str, steps: i32) -> String {
+pub fn transpose_chord_name(name: &str, steps: i32) -> String {
     if steps == 0 {
         return name.to_string();
     }

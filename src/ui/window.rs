@@ -1016,6 +1016,7 @@ impl Window {
 
         self.transpose_steps.set(0);
         self.controls.update_transpose_label(0);
+        self.tab_view.set_transpose_steps(0);
 
         self.title_widget
             .set_title(&format!("{} \u{2013} {}", tab.artist_name, tab.song_name));
@@ -1066,6 +1067,7 @@ impl Window {
         let steps = self.transpose_steps.get();
         self.controls.update_transpose_label(steps);
         self.chord_panel.set_transpose(steps);
+        self.tab_view.set_transpose_steps(steps);
 
         let original_lines = {
             let tab = self.current_tab.borrow();

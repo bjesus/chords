@@ -5,6 +5,7 @@ use gtk4::prelude::*;
 use gtk4::{self as gtk, glib};
 
 use crate::data::models::{LineKind, ParsedLine};
+use crate::ui::chord_diagrams;
 
 /// The main tab/chord content renderer using GtkTextView.
 /// Columns are implemented by splitting content across multiple TextViews
@@ -21,6 +22,7 @@ pub struct TabView {
     chord_color: Rc<std::cell::RefCell<String>>,
     section_color: Rc<std::cell::RefCell<String>>,
     column_count: Rc<Cell<i32>>,
+    transpose_steps: Rc<Cell<i32>>,
     scroll_speed_ms: Rc<Cell<u32>>,
     scroll_source_id: Rc<std::cell::RefCell<Option<glib::SourceId>>>,
     inhibit_cookie: Rc<Cell<Option<u32>>>,
@@ -33,9 +35,10 @@ impl TabView {
         columns_box.set_hexpand(true);
 
         // Start with a single text view
+        let transpose_steps = Rc::new(Cell::new(0));
         let buffer = gtk::TextBuffer::new(None);
         Self::create_tags(&buffer, "#3584e4", "#e66100");
-        let text_view = Self::make_text_view(&buffer);
+        let text_view = Self::make_text_view(&buffer, transpose_steps.clone());
 
         columns_box.append(&text_view);
 
@@ -56,6 +59,7 @@ impl TabView {
             font_size: Rc::new(Cell::new(14)),
             chord_color: Rc::new(std::cell::RefCell::new("#3584e4".to_string())),
             section_color: Rc::new(std::cell::RefCell::new("#e66100".to_string())),
+            transpose_steps,
             column_count: Rc::new(Cell::new(1)),
             scroll_speed_ms: Rc::new(Cell::new(500)),
             scroll_source_id: Rc::new(std::cell::RefCell::new(None)),
@@ -67,7 +71,7 @@ impl TabView {
         tv
     }
 
-    fn make_text_view(buffer: &gtk::TextBuffer) -> gtk::TextView {
+    fn make_text_view(buffer: &gtk::TextBuffer, transpose: Rc<Cell<i32>>) -> gtk::TextView {
         let text_view = gtk::TextView::with_buffer(buffer);
         text_view.set_editable(false);
         text_view.set_cursor_visible(false);
@@ -80,7 +84,57 @@ impl TabView {
         text_view.set_hexpand(true);
         text_view.set_vexpand(true);
         text_view.set_extra_menu(Some(&gtk::gio::Menu::new()));
+
+        // Chord diagram tooltip on hover
+        text_view.set_has_tooltip(true);
+        let buf = buffer.clone();
+        text_view.connect_query_tooltip(move |tv, x, y, _keyboard, tooltip| {
+            let (bx, by) = tv.window_to_buffer_coords(gtk::TextWindowType::Widget, x, y);
+            if let Some(iter) = tv.iter_at_location(bx, by) {
+                let tag_table = buf.tag_table();
+                if let Some(chord_tag) = tag_table.lookup("chord") {
+                    if iter.has_tag(&chord_tag) {
+                        if let Some(name) = Self::extract_chord_at_iter(&iter, &chord_tag) {
+                            // Apply current transposition to the chord name
+                            let steps = transpose.get();
+                            let display_name = if steps != 0 {
+                                chord_diagrams::transpose_chord_name(&name, steps)
+                            } else {
+                                name
+                            };
+                            if let Some(widget) =
+                                chord_diagrams::chord_tooltip_widget(&display_name)
+                            {
+                                tooltip.set_custom(Some(&widget));
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            false
+        });
+
         text_view
+    }
+
+    /// Extract the chord name text at the given iter position from a "chord"-tagged region.
+    fn extract_chord_at_iter(iter: &gtk::TextIter, tag: &gtk::TextTag) -> Option<String> {
+        let mut start = *iter;
+        if !start.starts_tag(Some(tag)) {
+            start.backward_to_tag_toggle(Some(tag));
+        }
+        let mut end = *iter;
+        if !end.ends_tag(Some(tag)) {
+            end.forward_to_tag_toggle(Some(tag));
+        }
+        let text = start.text(&end);
+        let trimmed = text.trim().to_string();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed)
+        }
     }
 
     fn create_tags(buffer: &gtk::TextBuffer, chord_color: &str, section_color: &str) {
@@ -125,7 +179,7 @@ impl TabView {
         for (i, chunk) in chunks.iter().enumerate() {
             let buffer = gtk::TextBuffer::new(None);
             Self::create_tags(&buffer, &cc, &sc);
-            let text_view = Self::make_text_view(&buffer);
+            let text_view = Self::make_text_view(&buffer, self.transpose_steps.clone());
 
             Self::render_lines_into_buffer(&buffer, chunk);
 
@@ -219,6 +273,10 @@ impl TabView {
 
     pub fn get_font_size(&self) -> i32 {
         self.font_size.get()
+    }
+
+    pub fn set_transpose_steps(&self, steps: i32) {
+        self.transpose_steps.set(steps);
     }
 
     pub fn set_font_family(&self, family: &str) {
